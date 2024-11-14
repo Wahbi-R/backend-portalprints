@@ -16,10 +16,10 @@ require('dotenv').config();
 const isProduction = process.env.NODE_ENV === 'production';
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false, // Accept Heroku's self-signed SSL certificate
-    },
-  });
-  
-  module.exports = pool;
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false, // Accept Heroku's self-signed SSL certificate
+  },
+});
+
+module.exports = pool;

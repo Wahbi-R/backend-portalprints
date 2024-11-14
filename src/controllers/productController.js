@@ -4,10 +4,10 @@ const productModel = require('../models/productModel');
 const getAllProducts = async (req, res) => {
     try {
         const products = await productModel.getAllProducts(req.userId);
-        res.status(200).json(products);
+        return res.status(200).json(products);
     } catch (error) {
         console.error("Error retrieving products:", error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -18,10 +18,10 @@ const getProductById = async (req, res) => {
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
-        res.status(200).json(product);
+        return res.status(200).json(product);
     } catch (error) {
         console.error("Error retrieving product:", error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -30,10 +30,10 @@ const createProduct = async (req, res) => {
     try {
         const productData = { ...req.body, user_id: req.userId };
         const product = await productModel.createProduct(productData);
-        res.status(201).json(product);
+        return res.status(201).json(product);
     } catch (error) {
         console.error("Error creating product:", error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -47,7 +47,7 @@ const updateProduct = async (req, res) => {
         res.status(200).json(product);
     } catch (error) {
         console.error("Error updating product:", error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -58,10 +58,10 @@ const deleteProduct = async (req, res) => {
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
-        res.status(200).json(product);
+        return res.status(200).json(product);
     } catch (error) {
         console.error("Error deleting product:", error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -70,10 +70,10 @@ const createVariant = async (req, res) => {
     try {
         const productId = req.params.productId;
         const variant = await productModel.createVariant(productId, req.body);
-        res.status(201).json(variant);
+        return res.status(201).json(variant);
     } catch (error) {
         console.error("Error creating variant:", error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -84,10 +84,10 @@ const updateVariant = async (req, res) => {
         if (!variant) {
             return res.status(404).json({ error: 'Variant not found' });
         }
-        res.status(200).json(variant);
+        return res.status(200).json(variant);
     } catch (error) {
         console.error("Error updating variant:", error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -98,10 +98,10 @@ const deleteVariant = async (req, res) => {
         if (!variant) {
             return res.status(404).json({ error: 'Variant not found' });
         }
-        res.status(200).json(variant);
+        return res.status(200).json(variant);
     } catch (error) {
         console.error("Error deleting variant:", error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 

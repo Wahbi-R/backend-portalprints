@@ -6,7 +6,6 @@ admin.initializeApp({
 });
 
 async function authenticateUser(req, res, next) {
-    next();
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -16,7 +15,7 @@ async function authenticateUser(req, res, next) {
         next();
     } catch (error) {
         console.error('Authentication error:', error);
-        res.status(401).json({ error: 'Unauthorized' });
+        return res.status(401).json({ error: 'Unauthorized' });
     }
 }
 

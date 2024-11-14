@@ -4,10 +4,10 @@ const getAllOrders = async (req, res) => {
     const { userId } = req;  // Extract userId from the request
     try {
         const orders = await orderModel.getOrdersByUserId(userId);
-        res.status(200).json(orders);
+        return res.status(200).json(orders);
     } catch (error) {
         console.error("Error retrieving orders:", error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -18,10 +18,10 @@ const createOrder = async (req, res) => {
 
     try {
         const order = await orderModel.createOrder(userId, orderData);
-        res.status(201).json(order);
+        return res.status(201).json(order);
     } catch (error) {
         console.error("Error creating order:", error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 
