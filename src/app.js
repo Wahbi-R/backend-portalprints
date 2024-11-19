@@ -7,6 +7,7 @@ const userRoutes = require('./routes/userRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const productRoutes = require('./routes/productRoutes');
 const storeRoutes = require('./routes/storeRoutes');
+const shopifyRoutes = require('./routes/shopifyRoutes')
 
 const app = express();
 app.use(cors());
@@ -20,5 +21,7 @@ app.use('/api', userRoutes);
 app.use('/api', orderRoutes);
 app.use('/api', productRoutes);
 app.use('/api', storeRoutes);
+app.use("/api", shopifyRoutes);
+
 
 module.exports = app;
