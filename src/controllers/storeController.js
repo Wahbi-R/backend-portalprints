@@ -14,15 +14,26 @@ const getAllStores = async (req, res) => {
 // Create an order linked to the authenticated user
 const addStoreConnection = async (req, res) => {
     const { userId, store_name, store_domain, store_access_key } = req.body;
-
+  
     try {
-        const store = await storeModel.addStoreConnection(userId, store_name, store_domain, store_access_key);
-        return res.status(201).json(store);
+      // Step 1: Check if the store already exists
+      const existingStore = await storeModel.getStoreByDomain(store_domain, userId);
+  
+      if (existingStore) {
+        console.log("Store already exists:", existingStore);
+        return res.status(200).json({ message: "Store already exists.", store: existingStore });
+      }
+  
+      // Step 2: Add the store if it doesn't exist
+      const store = await storeModel.addStoreConnection(userId, store_name, store_domain, store_access_key);
+  
+      console.log("New store added:", store);
+      return res.status(201).json(store);
     } catch (error) {
-        console.error("Error creating order:", error);
-        return res.status(500).json({ error: 'Internal server error: store addition' });
+      console.error("Error adding store connection:", error.message);
+      return res.status(500).json({ error: "Internal server error: store addition" });
     }
-};
+  };
 
 module.exports = {
     getAllStores,
