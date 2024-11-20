@@ -6,6 +6,6 @@ const validateOrder = require('../validators/orderValidator');
 
 router.post('/orders', authenticateUser, validateOrder, orderController.createOrder);
 // Fetch all orders with their related items, products, and variants
-router.get('/orders', orderController.getAllOrders);
+router.get('/orders', authenticateUser, orderController.getAllOrders);
 
 module.exports = router;

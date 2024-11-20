@@ -6,8 +6,8 @@ const authenticateUser = require('../middleware/authMiddleware');
 // Route to exchange Shopify authorization code for access token
 router.post("/shopify/exchange-token", authenticateUser, shopifyController.exchangeToken);
 // fetch Shopify orders
-router.post('/shopify/getShopOrders', shopifyController.processBulkOrders);
+router.post('/shopify/getShopOrders', authenticateUser, shopifyController.processBulkOrders);
 // fetch Shopify products
-router.post("/shopify/getStoreProducts", shopifyController.storeProducts);
+router.post("/shopify/getStoreProducts", authenticateUser, shopifyController.storeProducts);
 
 module.exports = router;
