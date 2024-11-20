@@ -3,7 +3,7 @@ const storeModel = require('../models/storeModels')
 
 
 const getAllOrders = async (req, res) => {
-    const { uid, storeDomain } = req.body;
+    const { uid, storeDomain } = req.query;
 
     if (!uid || !storeDomain) {
         return res.status(400).json({ error: "uid and storeDomain are required" });

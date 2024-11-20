@@ -1,7 +1,7 @@
 const storeModel = require('../models/storeModels');
 
 const getAllStores = async (req, res) => {
-    const { userId } = req;  // Extract userId from the request
+    const { userId } = req.query;  // Extract userId from the request
     try {
         const stores = await storeModel.getAllStoresByUserID(userId);
         return res.status(200).json(stores);
@@ -35,7 +35,13 @@ const addStoreConnection = async (req, res) => {
     }
   };
 
+  const saveShopifyAccessToken = async (req, res) => {
+    console.log(req)
+    return res.status(200)
+  }
+  
 module.exports = {
     getAllStores,
-    addStoreConnection
+    addStoreConnection,
+    saveShopifyAccessToken
 };
