@@ -18,7 +18,40 @@ const createOrder = async (userId, orderData) => {
     return result.rows[0];
 };
 
+
+// Fetch all orders for a given store_id
+const getOrdersByStoreId = async (storeId) => {
+    const result = await db.query(
+        `SELECT 
+            o.*,
+            s.store_name 
+         FROM orders o
+         JOIN stores s ON o.store_id = s.store_id
+         WHERE o.store_id = $1`,
+        [storeId]
+    );
+    return result.rows;
+};
+
+// Fetch all order items with their linked products and variants for specific order IDs
+const getOrderItemsByOrderIds = async (orderIds) => {
+    const result = await db.query(
+        `SELECT 
+            oi.*,
+            p.name,
+            v.variant_name 
+         FROM order_items oi
+         LEFT JOIN products p ON oi.product_id = p.product_id
+         LEFT JOIN variants v ON oi.variant_id = v.variant_id
+         WHERE oi.order_id = ANY ($1::int[])`,
+        [orderIds]
+    );
+    return result.rows;
+};
+
 module.exports = {
     getOrdersByUserId,
-    createOrder
+    createOrder,
+    getOrdersByStoreId,
+    getOrderItemsByOrderIds,
 };

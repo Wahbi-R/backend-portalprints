@@ -7,4 +7,5 @@ const authenticateUser = require('../middleware/authMiddleware');
 router.post('/stores/saveStore', authenticateUser, storeController.addStoreConnection);
 router.get('/stores', authenticateUser, storeController.getAllStores);
 
+
 module.exports = router;

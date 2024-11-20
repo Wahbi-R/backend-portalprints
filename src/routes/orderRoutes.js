@@ -4,8 +4,8 @@ const orderController = require('../controllers/orderController');
 const authenticateUser = require('../middleware/authMiddleware');
 const validateOrder = require('../validators/orderValidator');
 
-// Secure order-related routes
 router.post('/orders', authenticateUser, validateOrder, orderController.createOrder);
-router.get('/orders', authenticateUser, orderController.getAllOrders);
+// Fetch all orders with their related items, products, and variants
+router.get('/orders', orderController.getAllOrders);
 
 module.exports = router;

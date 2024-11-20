@@ -29,10 +29,35 @@ const getStoreByDomain = async (storeDomain, userId) => {
       console.error("Error retrieving store by domain:", error.message);
       throw error;
     }
-  };
+};
+
+const getAccessToken = async (uid, storeDomain) => {
+  const result = await db.query(
+    `SELECT store_access_key 
+      FROM stores 
+      WHERE user_id = $1 AND store_domain = $2`,
+    [uid, storeDomain]
+  );
+  if (result.rows.length === 0) {
+      return null; // Access token not found
+  }
+
+  return result.rows[0].store_access_key;
+};
+
+// Fetch store ID based on user_id and storeDomain
+const getStoreId = async (userId, storeDomain) => {
+  const result = await db.query(
+      'SELECT store_id FROM stores WHERE user_id = $1 AND store_domain = $2',
+      [userId, storeDomain]
+  );
+  return result.rows.length > 0 ? result.rows[0].store_id : null;
+};
 
 module.exports = {
     getAllStoresByUserID,
     addStoreConnection,
-    getStoreByDomain
+    getStoreByDomain,
+    getAccessToken,
+    getStoreId,
 };
