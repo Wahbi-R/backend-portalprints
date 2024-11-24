@@ -17,6 +17,24 @@ const addStoreConnection = async (userId, store_name, store_domain, store_access
     return result.rows[0];
 };
 
+// Update the stores access key
+const updateStoreAccessKey = async (userId, storeDomain, storeAccessKey) => {
+  try {
+    const result = await db.query(
+      `UPDATE stores
+       SET store_access_key = $1
+       WHERE store_domain = $2 AND user_id = $3
+       RETURNING *`,
+      [storeAccessKey, storeDomain, userId]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error updating store access key:", error.message);
+    throw error;
+  }
+};
+
+
 // Retrieve a store by domain and user ID
 const getStoreByDomain = async (storeDomain, userId) => {
     try {
@@ -60,4 +78,5 @@ module.exports = {
     getStoreByDomain,
     getAccessToken,
     getStoreId,
+    updateStoreAccessKey,
 };

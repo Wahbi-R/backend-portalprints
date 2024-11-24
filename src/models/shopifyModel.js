@@ -89,11 +89,26 @@ const storeOrdersAndItems = async (uid, storeDomain, ordersMap) => {
         }
 
         const storeId = storeResult.rows[0].store_id;
-        console.log("storeId is", storeId)
+        console.log("storeId is", storeId);
 
         for (const [orderId, orderData] of Object.entries(ordersMap)) {
-            // Insert or update the order
-            const { external_order_id, name, displayFulfillmentStatus, createdAt, total_cost, currency, shippingAddress, lineItems } = orderData;
+            // Extract fields from orderData
+            const {
+                external_order_id,
+                name,
+                displayFulfillmentStatus,
+                createdAt,
+                total_cost,
+                currency,
+                shippingAddress,
+                customer,
+                lineItems,
+            } = orderData;
+
+            // Concatenate customer name (if available)
+            const customerName = customer
+                ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
+                : null;
 
             const shippingAddressString = shippingAddress
                 ? `${shippingAddress.address1 || ''}, ${shippingAddress.address2 || ''} ${shippingAddress.city || ''}, ${shippingAddress.country || ''} ${shippingAddress.zip || ''}`
@@ -117,8 +132,8 @@ const storeOrdersAndItems = async (uid, storeDomain, ordersMap) => {
 
             await client.query(orderQuery, [
                 uid,
-                storeId, // Include the `store_id`
-                shippingAddress ? `${shippingAddress.firstName} ${shippingAddress.lastName}` : null,
+                storeId,
+                customerName, 
                 displayFulfillmentStatus,
                 createdAt,
                 total_cost,
@@ -126,7 +141,7 @@ const storeOrdersAndItems = async (uid, storeDomain, ordersMap) => {
                 shippingAddressString,
                 external_order_id,
                 'shopify',
-                name
+                name,
             ]);
 
             // Get the order ID from the database
@@ -167,8 +182,8 @@ const storeOrdersAndItems = async (uid, storeDomain, ordersMap) => {
 
                 await client.query(lineItemQuery, [
                     dbOrderId,
-                    productId, // Use fetched `product_id`
-                    variantId, // Use fetched `variant_id`
+                    productId,
+                    variantId, 
                     lineItem.quantity,
                     lineItem.item_price,
                     lineItem.currency,
@@ -177,14 +192,15 @@ const storeOrdersAndItems = async (uid, storeDomain, ordersMap) => {
             }
         }
 
-        await client.query('COMMIT'); // Commit transaction
+        await client.query('COMMIT'); 
     } catch (error) {
         await client.query('ROLLBACK'); // Rollback transaction on error
         throw error;
     } finally {
-        client.release(); // Release DB connection
+        client.release();
     }
 };
+
 
 
 module.exports = { 

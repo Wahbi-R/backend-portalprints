@@ -2,6 +2,7 @@ const axios = require('axios');
 const readline = require('readline');
 const shopifyModel = require('../models/shopifyModel')
 
+/// For Orders
 const initiateBulkOperation = async (storeDomain, accessToken) => {
     console.log(accessToken)
     const endpoint = `https://${storeDomain}/admin/api/2024-01/graphql.json`;
@@ -17,6 +18,10 @@ const initiateBulkOperation = async (storeDomain, accessToken) => {
                   name
                   displayFulfillmentStatus
                   createdAt
+                  customer {
+                    firstName
+                    lastName
+                  }
                   totalPriceSet {
                     shopMoney {
                         amount
@@ -196,6 +201,10 @@ const processJsonlFileAndStore = async (downloadUrl, uid, storeDomain) => {
                     createdAt: entry.createdAt,
                     total_cost: entry.totalPriceSet?.shopMoney?.amount || null,
                     currency: entry.totalPriceSet?.shopMoney?.currencyCode || null,
+                    customer: {
+                        firstName: entry.customer?.firstName || null,
+                        lastName: entry.customer?.lastName || null,
+                    },
                     shippingAddress: entry.shippingAddress,
                     lineItems: [],
                 };
