@@ -83,6 +83,19 @@ const deleteVariant = async (variantId) => {
     return result.rows[0];
 };
 
+const getProductsByStoreId = async (storeId) => {
+    const result = await db.query(
+        `SELECT 
+            o.*,
+            s.store_name 
+         FROM products o
+         JOIN stores s ON o.store_id = s.store_id
+         WHERE o.store_id = $1`,
+        [storeId]
+    );
+    return result.rows;
+};
+
 module.exports = {
     getAllProducts,
     getProductById,
@@ -91,5 +104,6 @@ module.exports = {
     deleteProduct,
     createVariant,
     updateVariant,
-    deleteVariant
+    deleteVariant,
+    getProductsByStoreId
 };

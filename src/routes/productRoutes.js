@@ -15,4 +15,5 @@ router.post('/products/:productId/variants', authenticateUser, productController
 router.put('/variants/:variantId', authenticateUser, productController.updateVariant);
 router.delete('/variants/:variantId', authenticateUser, productController.deleteVariant);
 
+router.post('/variants', authenticateUser, productController.getVariantByProductIDArray)
 module.exports = router;

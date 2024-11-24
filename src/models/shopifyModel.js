@@ -4,67 +4,69 @@ const addProductsAndVariants = async (products, variants, uid, storeDomain) => {
     const client = await db.connect();
 
     try {
-        await client.query('BEGIN'); // Start transaction
+        await client.query("BEGIN"); // Start transaction
 
         const productIdsMap = {};
 
         // Insert or update products
         for (const product of products) {
-            const result = await client.query(
-                `INSERT INTO products (external_product_id, user_id, name, description, vendor, store_id, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, 
-                    (SELECT store_id FROM stores WHERE store_domain = $6), NOW(), NOW())
-                 ON CONFLICT (external_product_id) DO UPDATE
-                 SET name = EXCLUDED.name,
-                     description = EXCLUDED.description,
-                     vendor = EXCLUDED.vendor,
-                     updated_at = NOW()
-                 RETURNING product_id`,
-                [
-                    product.external_product_id,
-                    uid,
-                    product.name,
-                    product.description,
-                    product.vendor,
-                    storeDomain,
-                ]
-            );
+        const result = await client.query(
+            `INSERT INTO products (external_product_id, user_id, name, description, vendor, image_url, store_id, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, 
+                (SELECT store_id FROM stores WHERE store_domain = $7), NOW(), NOW())
+            ON CONFLICT (external_product_id) DO UPDATE
+            SET name = EXCLUDED.name,
+                description = EXCLUDED.description,
+                vendor = EXCLUDED.vendor,
+                image_url = EXCLUDED.image_url, -- Update the image_url field
+                updated_at = NOW()
+            RETURNING product_id`,
+            [
+            product.external_product_id,
+            uid,
+            product.name,
+            product.description,
+            product.vendor,
+            product.image_url, // Include image_url
+            storeDomain,
+            ]
+        );
 
-            // Map the external product ID to the generated or existing internal product ID
-            productIdsMap[product.external_product_id] = result.rows[0].product_id;
+        // Map the external product ID to the generated or existing internal product ID
+        productIdsMap[product.external_product_id] = result.rows[0].product_id;
         }
 
         // Insert or update variants
         for (const variant of variants) {
-            const productId = productIdsMap[variant.external_parent_id];
-            if (productId) {
-                await client.query(
-                    `INSERT INTO variants (product_id, variant_name, price, sku, external_variant_id, external_parent_id, created_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, NOW())
-                     ON CONFLICT (external_variant_id) DO UPDATE
-                     SET variant_name = EXCLUDED.variant_name,
-                         price = EXCLUDED.price,
-                         sku = EXCLUDED.sku,
-                         updated_at = NOW()`,
-                    [
-                        productId,
-                        variant.variant_name,
-                        variant.price,
-                        variant.sku,
-                        variant.external_variant_id,
-                        variant.external_parent_id,
-                    ]
-                );
-            } else {
-                console.warn(
-                    `Variant with external_parent_id ${variant.external_parent_id} does not match any product. Skipping.`
-                );
-            }
+        const productId = productIdsMap[variant.external_parent_id];
+        if (productId) {
+            await client.query(
+            `INSERT INTO variants (product_id, variant_name, price, sku, external_variant_id, external_parent_id, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                ON CONFLICT (external_variant_id) DO UPDATE
+                SET variant_name = EXCLUDED.variant_name,
+                    price = EXCLUDED.price,
+                    sku = EXCLUDED.sku,
+                    updated_at = NOW()`,
+            [
+                productId,
+                variant.variant_name,
+                variant.price,
+                variant.sku,
+                variant.external_variant_id,
+                variant.external_parent_id,
+            ]
+            );
+        } else {
+            console.warn(
+            `Variant with external_parent_id ${variant.external_parent_id} does not match any product. Skipping.`
+            );
+        }
         }
 
-        await client.query('COMMIT'); // Commit transaction
+        await client.query("COMMIT"); // Commit transaction
     } catch (error) {
-        await client.query('ROLLBACK'); // Rollback transaction on error
+        await client.query("ROLLBACK"); // Rollback transaction on error
         console.error("Error adding or updating products and variants:", error.message);
         throw error;
     } finally {

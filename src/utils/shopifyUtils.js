@@ -256,6 +256,17 @@ const initiateBulkOperationForProducts = async (storeDomain, accessToken) => {
                                 title
                                 description
                                 vendor
+                                media(first: 10) {
+                            edges {
+                              node {
+                                ... on MediaImage {
+                                  image {
+                                    url
+                                  }
+                                }
+                              }
+                            }
+        }
                                 variants {
                                     edges {
                                         node {
@@ -295,45 +306,55 @@ const initiateBulkOperationForProducts = async (storeDomain, accessToken) => {
 };
 
 const processProductsJsonlFile = async (downloadUrl) => {
-    const response = await axios.get(downloadUrl, { responseType: 'stream' });
+    const response = await axios.get(downloadUrl, { responseType: "stream" });
     const rl = readline.createInterface({ input: response.data });
-
+  
     const products = {};
     const variants = [];
-
+  
     return new Promise((resolve, reject) => {
-        rl.on('line', (line) => {
-            try {
-                const entry = JSON.parse(line);
-
-                if (entry.id.includes("ProductVariant")) {
-                    variants.push({
-                        external_variant_id: entry.id,
-                        variant_name: entry.title,
-                        sku: entry.sku,
-                        price: entry.price,
-                        external_parent_id: entry.__parentId,
-                    });
-                } else if (entry.id.includes("Product")) {
-                    products[entry.id] = {
-                        external_product_id: entry.id,
-                        name: entry.title,
-                        description: entry.description,
-                        vendor: entry.vendor, // Add vendor here
-                    };
-                }
-            } catch (err) {
-                console.error("Error parsing line:", line, err);
+      rl.on("line", (line) => {
+        try {
+          const entry = JSON.parse(line);
+  
+          if (entry.id?.includes("ProductVariant")) {
+            // Process Product Variants
+            variants.push({
+              external_variant_id: entry.id,
+              variant_name: entry.title,
+              sku: entry.sku,
+              price: entry.price,
+              external_parent_id: entry.__parentId,
+            });
+          } else if (entry.id?.includes("Product")) {
+            // Process Products
+            products[entry.id] = {
+              external_product_id: entry.id,
+              name: entry.title,
+              description: entry.description,
+              vendor: entry.vendor,
+              image_url: null, // Initialize image_url as null
+            };
+          } else if (entry.image?.url && entry.__parentId?.includes("Product")) {
+            // Process Product Images
+            const productId = entry.__parentId;
+            if (products[productId]) {
+              products[productId].image_url = entry.image.url; // Associate the image with the product
             }
-        });
-
-        rl.on('close', () => {
-            resolve({ products: Object.values(products), variants });
-        });
-
-        rl.on('error', (err) => reject(err));
+          }
+        } catch (err) {
+          console.error("Error parsing line:", line, err);
+        }
+      });
+  
+      rl.on("close", () => {
+        resolve({ products: Object.values(products), variants });
+      });
+  
+      rl.on("error", (err) => reject(err));
     });
-};
+  };
+  
 
 
 module.exports = {
