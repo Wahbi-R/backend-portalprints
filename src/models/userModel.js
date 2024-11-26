@@ -21,7 +21,21 @@ const getUserById = async (userId) => {
     return result.rows[0];
 };
 
+const updateProfilePicture = async (userId, profileImageUrl) => {
+    console.log("profileimageURL:", profileImageUrl)
+    console.log("userID:", userId)
+    const result = await db.query(
+        `UPDATE users
+         SET profile_image_url = $1
+         WHERE user_id = $2
+         RETURNING *`,
+        [profileImageUrl, userId]
+    );
+    return result.rows[0];
+};
+
 module.exports = {
     createUser,
-    getUserById
+    getUserById,
+    updateProfilePicture
 };

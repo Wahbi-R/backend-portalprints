@@ -65,6 +65,7 @@ const processBulkOrders = async (req, res) => {
   if (!storeDomain || !uid) {
       return res.status(400).json({ error: "storeDomain and uid are required" });
   }
+  console.log(storeDomain)
 
   try {
       // Step 1: Fetch access token from the database
