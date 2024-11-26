@@ -9,6 +9,32 @@ const productRoutes = require('./routes/productRoutes');
 const storeRoutes = require('./routes/storeRoutes');
 const shopifyRoutes = require('./routes/shopifyRoutes')
 
+const fs = require('fs');
+const path = require('path');
+
+// Path to write the credentials file
+const credentialsPath = path.join(__dirname, 'google-credentials.json');
+
+// Check if the GOOGLE_CREDENTIALS_BASE64 environment variable exists
+if (process.env.GOOGLE_CREDENTIALS_BASE64) {
+  // Only write the file if it doesn't already exist
+  if (!fs.existsSync(credentialsPath)) {
+    // Decode the base64 string
+    const credentials = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+
+    // Write the JSON to a file
+    fs.writeFileSync(credentialsPath, credentials);
+
+    // Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to this file
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+
+    console.log('Google credentials file written successfully.');
+  } else {
+    console.log('Google credentials file already exists.');
+  }
+}
+
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -22,7 +48,6 @@ app.use('/api', orderRoutes);
 app.use('/api', productRoutes);
 app.use('/api', storeRoutes);
 app.use("/api", shopifyRoutes);
-
 
 
 module.exports = app;
