@@ -23,22 +23,6 @@ app.use('/api', productRoutes);
 app.use('/api', storeRoutes);
 app.use("/api", shopifyRoutes);
 
-const fs = require('fs');
-const path = require('path');
 
-// Path to write the credentials file
-const credentialsPath = path.join(__dirname, 'google-credentials.json');
-
-// Check if the GOOGLE_CREDENTIALS_BASE64 environment variable exists
-if (process.env.GOOGLE_CREDENTIALS_BASE64) {
-  // Decode the base64 string
-  const credentials = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('utf-8');
-
-  // Write the JSON to a file
-  fs.writeFileSync(credentialsPath, credentials);
-
-  // Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to this file
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
-}
 
 module.exports = app;
