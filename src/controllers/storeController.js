@@ -1,4 +1,5 @@
 const storeModel = require('../models/storeModels');
+const sessionModel = require('../models/sessionModel.js')
 
 const getAllStores = async (req, res) => {
     const { userId } = req.query;  // Extract userId from the request
@@ -14,13 +15,19 @@ const getAllStores = async (req, res) => {
 // Create an order linked to the authenticated user
 const addStoreConnection = async (req, res) => {
   const { userId, store_name, store_domain, store_access_key } = req.body;
-
+  console.log(store_access_key)
+  var newAccessKey = store_access_key
+  if (newAccessKey === null || newAccessKey === undefined) {
+    console.log("undef storekey")
+    newAccessKey = await sessionModel.getSessionAccessKeyByDomain(store_domain)
+    console.log("store_access_key:", newAccessKey)
+  }
   try {
     // Check if the store already exists
     const existingStore = await storeModel.getStoreByDomain(store_domain, userId);
 
     if (existingStore) {
-      if (existingStore.store_access_key !== store_access_key) {
+      if (existingStore.store_access_key !== newAccessKey) {
         // Update the store_access_key if it's different
         const updatedStore = await storeModel.updateStoreAccessKey(
           userId,
@@ -36,9 +43,9 @@ const addStoreConnection = async (req, res) => {
       console.log("Store already exists with the same access key:", existingStore);
       return res.status(200).json({ message: "Store already exists.", store: existingStore });
     }
-
     // Add the store if it doesn't exist
-    const store = await storeModel.addStoreConnection(userId, store_name, store_domain, store_access_key);
+    console.log(newAccessKey)
+    const store = await storeModel.addStoreConnection(userId, store_name, store_domain, newAccessKey);
 
     console.log("New store added:", store);
     return res.status(201).json(store);

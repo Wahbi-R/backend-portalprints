@@ -6,7 +6,7 @@ const authenticateUser = require('../middleware/authMiddleware');
 const multer = require('multer'); // Import multer
 
 // Secure user registration and profile routes
-router.post('/users/register', authenticateUser, userController.registerUser);
+router.post('/users/register', userController.registerUser);
 router.get('/users/profile', authenticateUser, userController.getUserProfile);
 
 // Configure Multer for file uploads

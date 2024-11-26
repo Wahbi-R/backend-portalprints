@@ -3,6 +3,7 @@ const userModel = require('../models/userModel');
 // Register or log in a user
 const registerUser = async (req, res) => {
     const { userId, email, name, businessName, businessUrl } = req.body;
+    console.log(req.body)
   
     try {
       // Check if user already exists
@@ -22,7 +23,7 @@ const registerUser = async (req, res) => {
 // Retrieve user profile by user ID (Firebase UID)
 const getUserProfile = async (req, res) => {
     const { userId } = req;
-
+    console.log("userId in getUserProfile:", userId)
     try {
         const user = await userModel.getUserById(userId);
         if (!user) {
