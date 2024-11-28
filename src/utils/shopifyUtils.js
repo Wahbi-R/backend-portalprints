@@ -18,6 +18,7 @@ const initiateBulkOperation = async (storeDomain, accessToken) => {
                   name
                   displayFulfillmentStatus
                   createdAt
+                  cancelledAt
                   customer {
                     firstName
                     lastName
@@ -120,6 +121,7 @@ const pollBulkOperation = async (storeDomain, accessToken) => {
         const currentOperation = response.data.data.currentBulkOperation;
         status = currentOperation.status;
         downloadUrl = currentOperation.url;
+        console.log(downloadUrl)
 
         if (status === "FAILED") {
             throw new Error(`Bulk operation failed with error: ${currentOperation.errorCode}`);
@@ -199,6 +201,7 @@ const processJsonlFileAndStore = async (downloadUrl, uid, storeDomain) => {
                     name: entry.name,
                     displayFulfillmentStatus: entry.displayFulfillmentStatus,
                     createdAt: entry.createdAt,
+                    cancelledAt: entry.cancelledAt,
                     total_cost: entry.totalPriceSet?.shopMoney?.amount || null,
                     currency: entry.totalPriceSet?.shopMoney?.currencyCode || null,
                     customer: {

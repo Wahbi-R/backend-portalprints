@@ -100,6 +100,7 @@ const storeOrdersAndItems = async (uid, storeDomain, ordersMap) => {
                 name,
                 displayFulfillmentStatus,
                 createdAt,
+                cancelledAt,
                 total_cost,
                 currency,
                 shippingAddress,
@@ -118,14 +119,15 @@ const storeOrdersAndItems = async (uid, storeDomain, ordersMap) => {
 
             const orderQuery = `
                 INSERT INTO orders (
-                    user_id, store_id, customer_name, order_status, order_date, total_cost, currency, shipping_address, external_order_id, source, external_order_name
+                    user_id, store_id, customer_name, order_status, order_date, cancelled_at, total_cost, currency, shipping_address, external_order_id, source, external_order_name
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                 ON CONFLICT (external_order_id)
                 DO UPDATE SET
                     customer_name = EXCLUDED.customer_name,
                     order_status = EXCLUDED.order_status,
                     order_date = EXCLUDED.order_date,
+                    cancelled_at = EXCLUDED.cancelled_at,
                     shipping_address = EXCLUDED.shipping_address,
                     total_cost = EXCLUDED.total_cost,
                     currency = EXCLUDED.currency,
@@ -138,6 +140,7 @@ const storeOrdersAndItems = async (uid, storeDomain, ordersMap) => {
                 customerName, 
                 displayFulfillmentStatus,
                 createdAt,
+                cancelledAt,
                 total_cost,
                 currency,
                 shippingAddressString,
