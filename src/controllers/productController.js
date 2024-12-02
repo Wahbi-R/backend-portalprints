@@ -154,7 +154,7 @@ const getVariantByProductIDArray = async (req, res) => {
     `;
     const { rows } = await client.query(query, [productIds]);
     client.release();
-    console.log(rows)
+    
     res.status(200).json(rows);
   } catch (error) {
     console.error("Error fetching variants:", error.message);
