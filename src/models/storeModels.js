@@ -64,13 +64,16 @@ const getAccessToken = async (uid, storeDomain) => {
 };
 
 // Fetch store ID based on user_id and storeDomain
-const getStoreId = async (userId, storeDomain) => {
+const getStoreId = async (storeDomain) => {
   const result = await db.query(
-      'SELECT store_id FROM stores WHERE user_id = $1 AND store_domain = $2',
-      [userId, storeDomain]
+      `SELECT MIN(store_id) AS store_id 
+       FROM stores 
+       WHERE store_domain = $1`,
+      [storeDomain]
   );
-  return result.rows.length > 0 ? result.rows[0].store_id : null;
+  return result.rows[0]?.store_id || null;
 };
+
 
 module.exports = {
     getAllStoresByUserID,

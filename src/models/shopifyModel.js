@@ -7,30 +7,28 @@ const addProductsAndVariants = async (products, variants, uid, storeDomain) => {
         await client.query("BEGIN"); // Start transaction
 
         const productIdsMap = {};
-
         // Insert or update products
         for (const product of products) {
-        const result = await client.query(
-            `INSERT INTO products (external_product_id, user_id, name, description, vendor, image_url, store_id, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, 
-                (SELECT store_id FROM stores WHERE store_domain = $7), NOW(), NOW())
-            ON CONFLICT (external_product_id) DO UPDATE
-            SET name = EXCLUDED.name,
-                description = EXCLUDED.description,
-                vendor = EXCLUDED.vendor,
-                image_url = EXCLUDED.image_url, -- Update the image_url field
-                updated_at = NOW()
-            RETURNING product_id`,
-            [
-            product.external_product_id,
-            uid,
-            product.name,
-            product.description,
-            product.vendor,
-            product.image_url, // Include image_url
-            storeDomain,
-            ]
-        );
+            const result = await client.query(
+                `INSERT INTO products (external_product_id, name, description, vendor, image_url, store_id, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, 
+                    (SELECT MIN(store_id) FROM stores WHERE store_domain = $6), NOW(), NOW())
+                ON CONFLICT (external_product_id) DO UPDATE
+                SET name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    vendor = EXCLUDED.vendor,
+                    image_url = EXCLUDED.image_url, -- Update the image_url field
+                    updated_at = NOW()
+                RETURNING product_id`,
+                [
+                    product.external_product_id,
+                    product.name,
+                    product.description,
+                    product.vendor,
+                    product.image_url,
+                    storeDomain,
+                ]
+            );
 
         // Map the external product ID to the generated or existing internal product ID
         productIdsMap[product.external_product_id] = result.rows[0].product_id;
@@ -80,16 +78,18 @@ const storeOrdersAndItems = async (uid, storeDomain, ordersMap) => {
     try {
         await client.query('BEGIN'); // Start transaction
 
-        // Fetch the `store_id` for the given `uid` and `storeDomain`
+        // Fetch the `store_id` for the given `storeDomain`
         const storeResult = await client.query(
-            'SELECT store_id FROM stores WHERE user_id = $1 AND store_domain = $2',
-            [uid, storeDomain]
+            `SELECT MIN(store_id) AS store_id 
+             FROM stores 
+             WHERE store_domain = $1`,
+            [storeDomain]
         );
-
-        if (storeResult.rows.length === 0) {
-            throw new Error('Store not found for the given user_id and store_domain');
+        
+        if (!storeResult.rows[0]?.store_id) {
+            throw new Error('Store not found for the given store_domain');
         }
-
+        
         const storeId = storeResult.rows[0].store_id;
         console.log("storeId is", storeId);
 

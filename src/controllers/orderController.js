@@ -11,7 +11,7 @@ const getAllOrders = async (req, res) => {
 
     try {
         // Get store ID based on uid and storeDomain
-        const storeId = await storeModel.getStoreId(uid, storeDomain);
+        const storeId = await storeModel.getStoreId(storeDomain);
 
         if (!storeId) {
             return res.status(404).json({ error: "Store not found for the given uid and storeDomain" });
