@@ -7,25 +7,30 @@ const getAllStoresByUserID = async (userId) => {
 };
 
 // Create a new order linked to a specific user
-const addStoreConnection = async (userId, store_name, store_domain, store_access_key) => {
+const addStoreConnection = async (store_name, store_domain, store_access_key) => {
+  try {
     const result = await db.query(
-        `INSERT INTO stores (user_id, store_name, store_domain, store_access_key)
-         VALUES ($1, $2, $3, $4)
-         RETURNING *`,
-        [userId, store_name, store_domain, store_access_key]
+      `INSERT INTO stores (store_name, store_domain, store_access_key)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [store_name, store_domain, store_access_key]
     );
     return result.rows[0];
+  } catch (error) {
+    console.error("Error adding store:", error.message);
+    throw error;
+  }
 };
 
 // Update the stores access key
-const updateStoreAccessKey = async (userId, storeDomain, storeAccessKey) => {
+const updateStoreAccessKey = async (storeDomain, storeAccessKey) => {
   try {
     const result = await db.query(
       `UPDATE stores
        SET store_access_key = $1
-       WHERE store_domain = $2 AND user_id = $3
+       WHERE store_domain = $2
        RETURNING *`,
-      [storeAccessKey, storeDomain, userId]
+      [storeAccessKey, storeDomain]
     );
     return result.rows[0];
   } catch (error) {
@@ -35,26 +40,28 @@ const updateStoreAccessKey = async (userId, storeDomain, storeAccessKey) => {
 };
 
 
+
 // Retrieve a store by domain and user ID
-const getStoreByDomain = async (storeDomain, userId) => {
-    try {
-      const result = await db.query(
-        `SELECT * FROM stores WHERE store_domain = $1 AND user_id = $2`,
-        [storeDomain, userId]
-      );
-      return result.rows[0]; // Return the store if found, or undefined if not
-    } catch (error) {
-      console.error("Error retrieving store by domain:", error.message);
-      throw error;
-    }
+const getStoreByDomain = async (storeDomain) => {
+  try {
+    const result = await db.query(
+      `SELECT * FROM stores WHERE store_domain = $1`,
+      [storeDomain]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error retrieving store by domain:", error.message);
+    throw error;
+  }
 };
 
-const getAccessToken = async (uid, storeDomain) => {
+
+const getAccessToken = async (storeDomain) => {
   const result = await db.query(
     `SELECT store_access_key 
       FROM stores 
-      WHERE user_id = $1 AND store_domain = $2`,
-    [uid, storeDomain]
+      WHERE store_domain = $1`,
+    [storeDomain]
   );
   if (result.rows.length === 0) {
       return null; // Access token not found

@@ -70,7 +70,7 @@ const processBulkOrders = async (req, res) => {
   try {
       // Step 1: Fetch access token from the database
       console.log(`Fetching access token for storeDomain: ${storeDomain} and uid: ${uid}`);
-      const accessToken = await storeModel.getAccessToken(uid, storeDomain);
+      const accessToken = await storeModel.getAccessToken(storeDomain);
 
       if (!accessToken) {
           return res.status(404).json({ error: "Access token not found for the given storeDomain and uid" });
@@ -106,7 +106,7 @@ const storeProducts = async (req, res) => {
   try {
       // Fetch access token for the given store and user
       console.log(`Fetching access token for storeDomain: ${storeDomain} and uid: ${uid}`);
-      const accessToken = await storeModel.getAccessToken(uid, storeDomain);
+      const accessToken = await storeModel.getAccessToken(storeDomain);
 
       if (!accessToken) {
           return res.status(404).json({ error: "Access token not found for the given storeDomain and uid" });
