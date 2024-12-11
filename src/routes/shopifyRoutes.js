@@ -9,5 +9,7 @@ router.post("/shopify/exchange-token", authenticateUser, shopifyController.excha
 router.post('/shopify/getShopOrders', authenticateUser, shopifyController.processBulkOrders);
 // fetch Shopify products
 router.post("/shopify/getStoreProducts", authenticateUser, shopifyController.storeProducts);
+// add a product to your shopify store
+router.post("/shopify/addProduct", authenticateUser, shopifyController.addProductToShopifyStore)
 
 module.exports = router;

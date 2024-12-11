@@ -81,6 +81,46 @@ const getStoreId = async (storeDomain) => {
   return result.rows[0]?.store_id || null;
 };
 
+// Save the product to the `store_products` table
+const saveProductToStoreProducts = async ({ store_id, product_id, external_product_id, price, availability }) => {
+  const client = await db.connect();
+  try {
+    await client.query(
+      `INSERT INTO store_products (store_id, product_id, external_product_id, price, availability, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+       ON CONFLICT (store_id, product_id) DO NOTHING`,
+      [store_id, product_id, external_product_id, price, availability]
+    );
+  } finally {
+    client.release();
+  }
+};
+
+// Fetch product with variants by product_id
+const getProductWithVariants = async (product_id) => {
+  const client = await db.connect();
+  try {
+    // Fetch product details
+    const productResult = await client.query(
+      `SELECT * FROM products WHERE product_id = $1`,
+      [product_id]
+    );
+
+    const product = productResult.rows[0];
+    if (!product) return null;
+
+    // Fetch associated variants
+    const variantsResult = await client.query(
+      `SELECT * FROM variants WHERE product_id = $1`,
+      [product_id]
+    );
+
+    product.variants = variantsResult.rows;
+    return product;
+  } finally {
+    client.release();
+  }
+};
 
 module.exports = {
     getAllStoresByUserID,
@@ -89,4 +129,6 @@ module.exports = {
     getAccessToken,
     getStoreId,
     updateStoreAccessKey,
+    saveProductToStoreProducts,
+    getProductWithVariants,
 };

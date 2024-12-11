@@ -358,14 +358,316 @@ const processProductsJsonlFile = async (downloadUrl) => {
     });
   };
   
+const addProductToShopify = async (storeDomain, accessToken, productData) => {
+  const url = `https://${storeDomain}/admin/api/2024-01/graphql.json`;
+
+  const mutation = `
+    mutation {
+      productCreate(input: {
+        title: "${productData.title}",
+        descriptionHtml: "${productData.description}",
+        vendor: "${productData.vendor}",
+        variants: [{
+          price: "${productData.price}",
+          sku: "${productData.sku}"
+        }],
+        images: [{
+          src: "${productData.imageUrl}"
+        }]
+      }) {
+        product {
+          id
+          title
+          variants(first: 10) {
+            edges {
+              node {
+                id
+                price
+              }
+            }
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await axios.post(
+      url,
+      { query: mutation },
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+    if (data.errors || data.data.productCreate.userErrors.length > 0) {
+      const errors = data.data.productCreate.userErrors.map(err => err.message).join(", ");
+      throw new Error(`Product creation failed: ${errors}`);
+    }
+
+    return data.data.productCreate.product;
+  } catch (error) {
+    console.error("Error in addProductToShopify utility:", error.message);
+    throw error;
+  }
+};
+
+const createProductWithVariants = async (storeDomain, accessToken, product) => {
+  const url = `https://${storeDomain}/admin/api/2024-07/graphql.json`;
+
+  const mutation = `
+    mutation {
+      productCreate(
+        input: {
+          title: "${product.name}",
+          descriptionHtml: "${product.description}",
+          vendor: "${product.vendor}",
+          productOptions: [
+            {
+              name: "Style",
+              values: [${product.variants.map((v) => `{ name: "${v.variant_name}" }`).join(", ")}]
+            }
+          ]
+        },
+        media: [
+          {
+            originalSource: "${product.image_url}",
+            alt: "Image for ${product.name}",
+            mediaContentType: IMAGE
+          }
+        ]
+      ) {
+        product {
+          id
+          title
+          options {
+            name
+            values
+          }
+          variants(first: 5) {
+            edges {
+              node {
+                id
+                price
+                selectedOptions {
+                  name
+                  value
+                }
+              }
+            }
+          }
+          media(first: 1) {
+            nodes {
+              alt
+              mediaContentType
+            }
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await axios.post(
+      url,
+      { query: mutation },
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+
+    console.log("Shopify Response:", JSON.stringify(data, null, 2));
+
+    if (data.errors || (data.data && data.data.productCreate.userErrors.length > 0)) {
+      const errors = (data.data.productCreate.userErrors || [])
+        .map((err) => err.message)
+        .join(", ");
+      throw new Error(`Product creation failed: ${errors}`);
+    }
+
+    return data.data.productCreate.product;
+  } catch (error) {
+    console.error("Error in createProductWithVariants utility:", error.message);
+    throw error;
+  }
+};
+
+// Create the product with options and an image
+const createProductWithImageAndOptions = async (storeDomain, accessToken, product) => {
+  const url = `https://${storeDomain}/admin/api/2024-07/graphql.json`;
+
+  const mutation = `
+    mutation {
+      productCreate(
+        input: {
+          title: "${product.name}",
+          descriptionHtml: "${product.description}",
+          vendor: "Portal",
+          productOptions: [
+            {
+              name: "Options",
+              values: [${product.variants.map((variant) => `{ name: "${variant.variant_name}" }`).join(", ")}]
+            }
+          ]
+        },
+        media: [
+          {
+            originalSource: "${product.image_url}",
+            alt: "Image for ${product.name}",
+            mediaContentType: IMAGE
+          }
+        ]
+      ) {
+        product {
+          id
+          title
+          options {
+            name
+            values
+          }
+          media(first: 1) {
+            nodes {
+              alt
+              mediaContentType
+            }
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await axios.post(
+      url,
+      { query: mutation },
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+    console.log("Product Creation Response:", JSON.stringify(data, null, 2));
+
+    if (data.errors || (data.data.productCreate.userErrors.length > 0)) {
+      const errors = data.data.productCreate.userErrors.map((err) => err.message).join(", ");
+      throw new Error(`Product creation failed: ${errors}`);
+    }
+
+    return data.data.productCreate.product; // Return the created product
+  } catch (error) {
+    console.error("Error in createProductWithImageAndOptions utility:", error.message);
+    throw error;
+  }
+};
+
+// Create all possible variants for the product
+const addVariantsToProduct = async (storeDomain, accessToken, productId, variants) => {
+  const url = `https://${storeDomain}/admin/api/2024-07/graphql.json`;
+
+  const mutation = `
+    mutation {
+      productVariantsBulkCreate(
+        productId: "${productId}",
+        variants: [
+          ${variants
+            .map(
+              (variant) => `{
+                price: ${variant.price},
+                optionValues: [
+                  { name: "${variant.variant_name}", optionName: "Options" }
+                ]
+              }`
+            )
+            .join(", ")}
+        ]
+      ) {
+        productVariants {
+          id
+          title
+          selectedOptions {
+            name
+            value
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await axios.post(
+      url,
+      { query: mutation },
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+    console.log("Variant Creation Response:", JSON.stringify(data, null, 2));
+
+    if (data.errors || (data.data.productVariantsBulkCreate.userErrors.length > 0)) {
+      const errors = data.data.productVariantsBulkCreate.userErrors.map((err) => err.message).join(", ");
+      throw new Error(`Variant creation failed: ${errors}`);
+    }
+
+    return data.data.productVariantsBulkCreate.productVariants; // Return the created variants
+  } catch (error) {
+    console.error("Error in addVariantsToProduct utility:", error.message);
+    throw error;
+  }
+};
+
+const generateVariants = (variants, defaultPrice) => {
+  return variants.map((variant) => ({
+    color: variant.variant_name,
+    price: variant.price || defaultPrice,
+  }));
+};
 
 
 module.exports = {
-    initiateBulkOperation,
-    pollBulkOperation,
-    processJsonlFile,
-    initiateBulkOperationForProducts,
-    processProductsJsonlFile,
-    processJsonlFileAndStore,
+  createProductWithImageAndOptions,
+  addVariantsToProduct,
+  generateVariants,
+  initiateBulkOperation,
+  pollBulkOperation,
+  processJsonlFile,
+  initiateBulkOperationForProducts,
+  processProductsJsonlFile,
+  processJsonlFileAndStore,
+  addProductToShopify,
+  createProductWithVariants,
 };
+
   

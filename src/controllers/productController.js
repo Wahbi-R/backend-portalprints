@@ -4,7 +4,7 @@ const db = require('../config/db.config');
 
 // Get all products (or products for a specific user)
 const getAllProducts = async (req, res) => {
-    const { uid, storeDomain } = req.query;
+    const { uid, storeDomain, vendor } = req.query;
 
     if (!uid || !storeDomain) {
         return res.status(400).json({ error: "uid and storeDomain are required" });
@@ -19,7 +19,8 @@ const getAllProducts = async (req, res) => {
         }
 
         // Get all orders for the store
-        const products = await productModel.getProductsByStoreId(storeId);
+        //const products = await productModel.getProductsByStoreId(storeId);
+        const products = await productModel.getProductsByVendor(vendor);
 
         if (products.length === 0) {
             return res.status(404).json({ error: "No products found for the given store" });

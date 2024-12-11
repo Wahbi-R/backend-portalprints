@@ -96,6 +96,17 @@ const getProductsByStoreId = async (storeId) => {
     return result.rows;
 };
 
+const getProductsByVendor = async (vendor) => {
+    const result = await db.query(
+        `SELECT * 
+         FROM products 
+         WHERE vendor = $1`,
+        [vendor]
+    );
+    return result.rows;
+};
+
+
 module.exports = {
     getAllProducts,
     getProductById,
@@ -105,5 +116,6 @@ module.exports = {
     createVariant,
     updateVariant,
     deleteVariant,
-    getProductsByStoreId
+    getProductsByStoreId,
+    getProductsByVendor,
 };

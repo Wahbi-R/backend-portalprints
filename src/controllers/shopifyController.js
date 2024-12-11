@@ -136,6 +136,80 @@ const storeProducts = async (req, res) => {
   }
 };
 
+const addProductToShopifyStore = async (req, res) => {
+  const { uid, storeDomain, product_id } = req.body;
+
+  console.log(uid, storeDomain, product_id);
+  console.log("Running addProductToShopifyStore");
+
+  if (!storeDomain || !uid || !product_id) {
+    return res.status(400).json({ error: "storeDomain, uid, and product_id are required" });
+  }
+
+  try {
+    // Step 1: Fetch product and variants from the database
+    const product = await storeModel.getProductWithVariants(product_id);
+    if (!product) {
+      console.error("Product not found in the database");
+      return res.status(404).json({ error: "Product not found in the database" });
+    }
+    console.log("Fetched product:", product);
+
+    // Step 2: Fetch the Shopify access token
+    const accessToken = await storeModel.getAccessToken(storeDomain);
+    if (!accessToken) {
+      console.error("Access token not found for storeDomain:", storeDomain);
+      return res.status(404).json({ error: "Access token not found for the given storeDomain and uid" });
+    }
+    console.log("Fetched access token for storeDomain:", storeDomain);
+
+    // Step 3: Create the product with image and options in Shopify
+    console.log("Creating product with image and options in Shopify...");
+    const createdProduct = await shopifyUtils.createProductWithImageAndOptions(storeDomain, accessToken, product);
+    console.log("Created product in Shopify:", createdProduct);
+
+    // Step 4: Generate all possible variants
+    const variants = shopifyUtils.generateVariants(product.variants, product.variants[0]?.price || null);
+    console.log("Generated variants:", variants);
+
+    // Step 5: Add variants to the product in Shopify
+    console.log("Adding variants to the product in Shopify...");
+    const createdVariants = await shopifyUtils.addVariantsToProduct(storeDomain, accessToken, createdProduct.id, variants);
+    console.log("Created variants in Shopify:", createdVariants);
+
+    // Step 6: Fetch the store details
+    const store = await storeModel.getStoreByDomain(storeDomain);
+    if (!store) {
+      console.error("Store not found in the database for domain:", storeDomain);
+      return res.status(404).json({ error: "Store not found in the database" });
+    }
+    console.log("Fetched store details:", store);
+
+    // Step 7: Save the product to `store_products` table
+    console.log("Saving product to store_products...");
+    await storeModel.saveProductToStoreProducts({
+      store_id: store.store_id,
+      product_id: product.product_id,
+      external_product_id: createdProduct.id,
+      price: product.variants[0]?.price || null, // Use the price of the first variant
+      availability: true, // Default to available
+    });
+    console.log("Product saved to store_products successfully");
+
+    res.status(201).json({
+      message: "Product and variants created successfully in Shopify and saved to store_products",
+      product: createdProduct,
+      variants: createdVariants,
+    });
+  } catch (error) {
+    console.error("Error creating product and variants:", error.message);
+    res.status(500).json({ error: "Failed to create product and variants" });
+  }
+};
+
+
+
+
 module.exports = {
     processBulkOrders,
 };
@@ -144,4 +218,5 @@ module.exports = {
   exchangeToken,
   processBulkOrders,
   storeProducts,
+  addProductToShopifyStore,
 };
