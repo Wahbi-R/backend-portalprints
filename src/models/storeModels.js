@@ -96,6 +96,10 @@ const saveProductToStoreProducts = async ({ store_id, product_id, external_produ
   }
 };
 
+const saveProductVariants = async ({ store_id, product_id, external_product_id, variant_id }) => {
+  
+}
+
 // Fetch product with variants by product_id
 const getProductWithVariants = async (product_id) => {
   const client = await db.connect();
