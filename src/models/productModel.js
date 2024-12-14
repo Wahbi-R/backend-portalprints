@@ -155,7 +155,8 @@ const getProductsWithStoreMeta = async (storeId) => {
         FROM products p
 			LEFT OUTER JOIN store_variants sv
 				ON sv.product_id = p.product_id
-        WHERE sv.store_id = $1 OR sv.store_id IS NULL;
+        WHERE sv.store_id = $1 OR sv.store_id IS NULL
+        GROUP BY p.product_id, sv.store_id, sv.external_product_id, sv.availability;
 		`,
         [storeId]
     );
