@@ -1,7 +1,8 @@
 const fetch = require("node-fetch");
 const storeModel = require("../models/storeModels"); 
-const shopifyUtils = require("../utils/shopifyUtils")
-const shopifyModel = require("../models/shopifyModel")
+const shopifyUtils = require("../utils/shopifyUtils");
+const shopifyModel = require("../models/shopifyModel");
+const productModel = require("../models/productModel");
 
 const exchangeToken = async (req, res) => {
   const { code, shop, uid } = req.body;
@@ -136,87 +137,139 @@ const storeProducts = async (req, res) => {
   }
 };
 
-const addProductToShopifyStore = async (req, res) => {
+const addOrUpdateProduct = async (req, res) => {
   const { uid, storeDomain, product_id } = req.body;
-
-  console.log(uid, storeDomain, product_id);
-  console.log("Running addProductToShopifyStore");
 
   if (!storeDomain || !uid || !product_id) {
     return res.status(400).json({ error: "storeDomain, uid, and product_id are required" });
   }
 
   try {
-    // Step 1: Fetch product and variants from the database
-    const product = await storeModel.getProductWithVariants(product_id);
+    // fetch the store information
+    let store = await storeModel.getStoreByDomain(storeDomain);
+    if (!store || !store.store_id) { // we specifically need store_id for everything else
+      const errMsg = `Store "${storeDomain}" not found`;
+      return res.status(400).send({ message: errMsg });
+    }
+
+    const accessToken = store.store_access_key;
+    
+    // Create the fulfillment service if it doesn't exist
+    if (!store.fulfillment_service_id) {
+      const fulfillmentSvc = await shopifyUtils.createFulfillmentService(storeDomain, accessToken);
+      console.log(fulfillmentSvc);
+      store = storeModel.setFulfillmentServiceId(storeDomain, fulfillmentSvc.id, fulfillmentSvc.location.id);
+    }
+    console.log("Current store", store);
+
+
+    // fetch the internal product
+    const product = await productModel.getProductByIdWithStoreMeta(product_id, store.store_id);
     if (!product) {
-      console.error("Product not found in the database");
-      return res.status(404).json({ error: "Product not found in the database" });
+      const errMsg = `Product ID "${product_id}" does not exist`; 
+      return res.status(400).send({ message: errMsg });
     }
-    console.log("Fetched product:", product);
+    console.log("Product", JSON.stringify(product, null, 2));
+    // Either a list of options or empty - either is fine
+    const productOptions = await productModel.getProductOptions(product_id);
 
-    // Step 2: Fetch the Shopify access token
-    const accessToken = await storeModel.getAccessToken(storeDomain);
-    if (!accessToken) {
-      console.error("Access token not found for storeDomain:", storeDomain);
-      return res.status(404).json({ error: "Access token not found for the given storeDomain and uid" });
+    // TODO: Filter variants down to the requested ones
+    // TODO: Also need to handle deleted variants at some point
+    if (req.body.variant_ids instanceof Array) {
+      if (req.body.variant_ids.length === 0) {
+        return res.status(400).send({ message: "Need at least one variant" });
+      }
+      product.variants = product.variants.filter(
+        v => req.body.variant_ids.indexOf(v.variant_id)
+      );
     }
-    console.log("Fetched access token for storeDomain:", storeDomain);
 
-    // Step 3: Create the product with image and options in Shopify
-    console.log("Creating product with image and options in Shopify...");
-    const createdProduct = await shopifyUtils.createProductWithImageAndOptions(storeDomain, accessToken, product);
-    console.log("Created product in Shopify:", createdProduct);
+    let productRes = undefined;
+    const productPayload = {
+      name: req.body.name ?? product.name,
+      description: req.body.description ?? product.description,
+      imageUrl: product.image_url,
 
-    // Step 4: Generate all possible variants
-    const variants = shopifyUtils.generateVariants(product.variants, product.variants[0]?.price || null);
-    console.log("Generated variants:", variants);
+      // TODO: Does Shopify dedupe product options? Or do we need to provide an ID
+      productOptions,
 
-    // Step 5: Add variants to the product in Shopify
-    console.log("Adding variants to the product in Shopify...");
-    const createdVariants = await shopifyUtils.addVariantsToProduct(storeDomain, accessToken, createdProduct.id, variants);
-    console.log("Created variants in Shopify:", createdVariants);
+      // if forwarding product status to Shopify, do it here
+      // status: "ACTIVE" | "ARCHIVED" | "DRAFT",
+    };
+    console.log("Product payload", productPayload);
 
-    // Step 6: Fetch the store details
-    const store = await storeModel.getStoreByDomain(storeDomain);
-    if (!store) {
-      console.error("Store not found in the database for domain:", storeDomain);
-      return res.status(404).json({ error: "Store not found in the database" });
+    // If the product already exists, we're updating
+    // TODO: Verify that the product actually exists in Shopify, and wasn't deleted - ideally at refresh, and not here
+    if (product.external_product_id) {
+      throw new Error("Not implemented");
+      productRes = shopifyUtils.updateProduct(storeDomain, accessToken, product.external_product_id, productPayload);
+    } else {
+      // otherwise create the product and store the ID for later
+      productRes = await shopifyUtils.addProductToShopify(
+        storeDomain, 
+        accessToken, 
+        productPayload
+      );
     }
-    console.log("Fetched store details:", store);
+    
+    console.log("Shopify product response", productRes);
+    const externalProductId = productRes.id;
 
-    // Step 7: Save the product to `store_products` table
-    console.log("Saving product to store_products...");
-    await storeModel.saveProductToStoreProducts({
-      store_id: store.store_id,
-      product_id: product.product_id,
-      external_product_id: createdProduct.id,
-      price: product.variants[0]?.price || null, // Use the price of the first variant
-      availability: true, // Default to available
+    // Batch the requests for variants, as recommended
+    const variantsPayload = product.variants.map(v => {
+      // TODO: Clean this up
+      const selectedOptions = productOptions.map(({ name, values }) => {
+        const selectedValue = values.find(({ variantId }) => variantId === v.variant_id);
+        return { name, value: selectedValue.value };
+      });
+      return {
+        id: v.external_variant_id ?? undefined,
+        sku: v.sku,
+        optionValues: selectedOptions.map(o => {
+          return {
+            name: o.name,
+            value: o.value,
+          }
+        })
+      }
     });
-    console.log("Product saved to store_products successfully");
+    const variantsRes = await shopifyUtils.addVariantsToProduct(
+      storeDomain, 
+      accessToken, 
+      externalProductId, 
+      store.location_id,
+      product.price, 
+      variantsPayload,
+    );
+    console.log("Variants res", JSON.stringify(variantsRes, null, 2));
 
-    res.status(201).json({
-      message: "Product and variants created successfully in Shopify and saved to store_products",
-      product: createdProduct,
-      variants: createdVariants,
-    });
+    // Store the variant IDs
+    const dbResult = await productModel.saveStoreVariants(
+      store.store_id,
+      product_id,
+      externalProductId,
+      variantsRes.map(({ id: externalVariantId, sku }) => {
+        return {
+          variant_id: product.variants.find(v => v.sku === sku).variant_id,
+          external_variant_id: externalVariantId
+        }
+      })
+    );
+    console.log("DB result", dbResult);
+
+    // TODO: Handle publishing to Shopify Online Store - right now user has to publish manually from Shopify admin
+
+    return res.status(201).send({ });
   } catch (error) {
-    console.error("Error creating product and variants:", error.message);
-    res.status(500).json({ error: "Failed to create product and variants" });
+    console.error("Error adding product", error);
+    return res.status(500).send({ message: "Failed to add product to Shopify" });
   }
 };
 
-
-
-
 module.exports = {
-    processBulkOrders,
-};
-
-module.exports = {
+  processBulkOrders,
   exchangeToken,
   processBulkOrders,
   storeProducts,
-  addProductToShopifyStore,
+  addOrUpdateProduct
 };

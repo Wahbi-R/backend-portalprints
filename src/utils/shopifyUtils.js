@@ -1,6 +1,11 @@
 const axios = require('axios');
 const readline = require('readline');
-const shopifyModel = require('../models/shopifyModel')
+const shopifyModel = require('../models/shopifyModel');
+
+// TODO: Handle rate limits
+
+const getApiUrl = (storeDomain, version = "2024-01") =>
+  `https://${storeDomain}/admin/api/${version}/graphql.json`;
 
 /// For Orders
 const initiateBulkOperation = async (storeDomain, accessToken) => {
@@ -359,33 +364,110 @@ const processProductsJsonlFile = async (downloadUrl) => {
   };
   
 const addProductToShopify = async (storeDomain, accessToken, productData) => {
+  const url = getApiUrl(storeDomain, "2024-10");
+  // very jank, use input variables instead of setting it in the mutation string
+  // productData.description = productData.description.replace("\"", "&quot;");
+
+  const mutation = `
+    mutation CreateProduct($name: String, $description: String) {
+      productCreate(
+        product: {
+          title: $name,
+          descriptionHtml: $description,
+          vendor: "Portal",
+          productOptions: [
+            ${productData.productOptions.map(opt => {
+              return `
+                {
+                  name: "${opt.name}",
+                  values: [
+                    ${opt.values.map(v => `{ name: "${v.value}" }`).join(", ")}
+                  ]
+                }
+              `
+            })}
+          ]
+
+          # customer needs to publish to channels in Shopify admin
+          status: DRAFT
+        },
+        media: [
+          {
+            alt: "Image of $name",
+            mediaContentType: IMAGE,
+            originalSource: "${productData.imageUrl}"
+          }
+        ]
+      ) {
+          product {
+            id
+            title
+            descriptionHtml
+            status
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+    }
+  `;
+
+  const payload = {
+    query: mutation,
+    variables: {
+      name: productData.name,
+      description: productData.description
+    }
+  };
+  console.log(JSON.stringify(payload));
+  
+  try {
+    const response = await axios.post(
+      url,
+      payload,
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+    console.log("Product creation response", data);
+    if (data.errors || data.data.productCreate.userErrors.length > 0) {
+      const errors = data.data.productCreate.userErrors.map(err => err.message).join(", ");
+      throw new Error(`Product creation failed: ${errors}`);
+    }
+
+    return data.data.productCreate.product;
+  } catch (error) {
+    console.error("Error in addProductToShopify utility:", error.message);
+    throw error;
+  }
+};
+
+const updateProduct = async (storeDomain, accessToken, externalProductId, productData) => {
   const url = `https://${storeDomain}/admin/api/2024-01/graphql.json`;
 
   const mutation = `
     mutation {
       productCreate(input: {
-        title: "${productData.title}",
+        title: "${productData.name}",
         descriptionHtml: "${productData.description}",
-        vendor: "${productData.vendor}",
-        variants: [{
-          price: "${productData.price}",
-          sku: "${productData.sku}"
-        }],
+        vendor: "Portal",
         images: [{
           src: "${productData.imageUrl}"
         }]
+        # add status here if forwarding
       }) {
         product {
           id
           title
-          variants(first: 10) {
-            edges {
-              node {
-                id
-                price
-              }
-            }
-          }
+          descriptionHtml
+          status
+          images
         }
         userErrors {
           field
@@ -509,6 +591,59 @@ const createProductWithVariants = async (storeDomain, accessToken, product) => {
   }
 };
 
+const getProduct = async (storeDomain, accessToken, externalProductId) => {
+  const url = getApiUrl(storeDomain, "2024-01");
+  // fields can be removed here if it becomes too expensive
+  const query = `
+    query {
+      product(id: "${externalProductId}") {
+        id
+        title
+        description
+        descriptionHtml
+        published
+        status
+        onlineStoreUrl # determines whether it's published or not
+        variants(first: 100) {
+          edges {
+            node {
+              id
+              availableForSale
+              sku # required for fulfillment
+              price
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await axios.post(
+      url,
+      { query },
+      { 
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const data = response.data;
+    console.log("Fetch product response", data);
+    if (data.errors || data.data.product.userErrors.length > 0) {
+      const errors = data.data.product.userErrors.map(err => err.message).join(", ");
+      throw new Error(`Product fetch failed: ${errors}`);
+    }
+
+    return data.data.product.product;
+  } catch (error) {
+    console.error(`Failed to fetch product "${externalProductId}" from Shopify`, error);
+    throw error;
+  }
+};
+
 // Create the product with options and an image
 const createProductWithImageAndOptions = async (storeDomain, accessToken, product) => {
   const url = `https://${storeDomain}/admin/api/2024-07/graphql.json`;
@@ -585,20 +720,38 @@ const createProductWithImageAndOptions = async (storeDomain, accessToken, produc
 };
 
 // Create all possible variants for the product
-const addVariantsToProduct = async (storeDomain, accessToken, productId, variants) => {
+const addVariantsToProduct = async (storeDomain, accessToken, externalProductId, locationId, price, variants) => {
   const url = `https://${storeDomain}/admin/api/2024-07/graphql.json`;
 
   const mutation = `
     mutation {
       productVariantsBulkCreate(
-        productId: "${productId}",
+        productId: "${externalProductId}",
+        strategy: REMOVE_STANDALONE_VARIANT,
         variants: [
-          ${variants
-            .map(
+          ${variants.map(
               (variant) => `{
-                price: ${variant.price},
+                price: ${price},
+                inventoryItem: {
+                  sku: "${variant.sku}",
+                  requiresShipping: true,
+                  tracked: false
+                },
+                inventoryQuantities: [{
+                  availableQuantity: 1,
+                  locationId: "${locationId}"
+                }],
+                # Ignore the following, location ID MUST BE SET
+                # If you want Shopify to not broadcast this item to all fulfillment services,
+                # the product's inventory has to be tracked - example below
+                # inventoryQuantities: [{
+                #   locationId: "gid://shopify/Location/1234567", # this is the location ID created by fulfillmentServiceCreate
+                #   availableQuantity: 1000000
+                # }],
                 optionValues: [
-                  { name: "${variant.variant_name}", optionName: "Options" }
+                  ${variant.optionValues.map(
+                    o => `{ optionName: "${o.name}", name: "${o.value}"}`
+                  )}
                 ]
               }`
             )
@@ -608,6 +761,9 @@ const addVariantsToProduct = async (storeDomain, accessToken, productId, variant
         productVariants {
           id
           title
+          sku
+          availableForSale
+          price
           selectedOptions {
             name
             value
@@ -620,6 +776,7 @@ const addVariantsToProduct = async (storeDomain, accessToken, productId, variant
       }
     }
   `;
+  console.log(mutation);
 
   try {
     const response = await axios.post(
@@ -636,7 +793,7 @@ const addVariantsToProduct = async (storeDomain, accessToken, productId, variant
     const data = response.data;
     console.log("Variant Creation Response:", JSON.stringify(data, null, 2));
 
-    if (data.errors || (data.data.productVariantsBulkCreate.userErrors.length > 0)) {
+    if (data.errors || (data.data?.productVariantsBulkCreate?.userErrors?.length > 0)) {
       const errors = data.data.productVariantsBulkCreate.userErrors.map((err) => err.message).join(", ");
       throw new Error(`Variant creation failed: ${errors}`);
     }
@@ -655,6 +812,117 @@ const generateVariants = (variants, defaultPrice) => {
   }));
 };
 
+const createFulfillmentService = async (storeDomain, accessToken) => {
+  const apiUrl = getApiUrl(storeDomain, "2024-10");
+  const mutation = `
+    mutation($name: String!, $callbackUrl: URL!, $trackingSupport: Boolean) {
+      fulfillmentServiceCreate(
+        name: $name, 
+        callbackUrl: $callbackUrl,
+        trackingSupport: $trackingSupport#,
+        # inventoryManagement: true
+      ) {
+        fulfillmentService {
+          id
+          callbackUrl
+          location {
+            id
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+  const payload = { 
+    name: "Portal Prints",
+    callbackUrl: (process.env.BACKEND_DOMAIN ?? "https://backend.portalprints.com") + "/webhooks/fulfillment",
+    trackingSupport: true,
+  };
+
+  try {
+    const response = await axios.post(
+      apiUrl,
+      { query: mutation, variables: payload },
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+    console.log("Fulfillment service creation response:", JSON.stringify(data, null, 2));
+
+    if (data.errors || (data.data?.fulfillmentServiceCreate?.userErrors?.length > 0)) {
+      const errors = data.data.fulfillmentServiceCreate.userErrors.map((err) => err.message).join(", ");
+      throw new Error(`Fulfillment service creation failed: ${errors}`);
+    }
+
+    return data.data.fulfillmentServiceCreate.fulfillmentService; // Return the created variants
+  } catch (error) {
+    console.error("Error in createFulfillmentService utility:", error.message);
+    throw error;
+  }
+};
+
+const carrierServiceCreate = async (storeDomain) => {
+  const apiUrl = getApiUrl(storeDomain, "2024-10");
+  const mutation = `
+    mutation {
+      carrierServiceCreate({ 
+        name: $name, 
+        callbackUrl: $callbackUrl,
+        trackingSupport: $trackingSupport,
+        # inventoryManagement: true
+      }) {
+        fulfillmentService {
+          id
+          name
+          callbackUrl
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+  const payload = { 
+    name: "Portal",
+    active: true,
+    callbackUrl: (process.env.BACKEND_DOMAIN ?? "https://backend.portalprints.com") + "/webhooks/carrier",
+  };
+
+  try {
+    const response = await axios.post(
+      apiUrl,
+      { query: mutation, variables: payload },
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+    console.log("Fulfillment service creation response:", JSON.stringify(data, null, 2));
+
+    if (data.errors || (data.data?.fulfillmentServiceCreate?.userErrors?.length > 0)) {
+      const errors = data.data.fulfillmentServiceCreate.userErrors.map((err) => err.message).join(", ");
+      throw new Error(`Fulfillment service creation failed: ${errors}`);
+    }
+
+    return data.data.fulfillmentServiceCreate.productVariants; // Return the created variants
+  } catch (error) {
+    console.error("Error in createFulfillmentService utility:", error.message);
+    throw error;
+  }
+}
 
 module.exports = {
   createProductWithImageAndOptions,
@@ -668,6 +936,7 @@ module.exports = {
   processJsonlFileAndStore,
   addProductToShopify,
   createProductWithVariants,
+  createFulfillmentService,
 };
 
   

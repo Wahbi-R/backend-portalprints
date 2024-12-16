@@ -12,6 +12,7 @@ const getAllProducts = async (req, res) => {
 
     try {
         // Get store ID based on uid and storeDomain
+        // TODO: Check UID 
         const storeId = await storeModel.getStoreId(storeDomain);
 
         if (!storeId) {
@@ -20,11 +21,21 @@ const getAllProducts = async (req, res) => {
 
         // Get all orders for the store
         //const products = await productModel.getProductsByStoreId(storeId);
-        const products = await productModel.getProductsByVendor(vendor);
+        let products = await productModel.getProductsWithStoreMeta(storeId);
+        // const products = await productModel.getProductsByVendor(vendor);
 
-        if (products.length === 0) {
-            return res.status(404).json({ error: "No products found for the given store" });
-        }
+        // if (products.length === 0) {
+        //     return res.status(404).json({ error: "No products found for the given store" });
+        // }
+
+        // Re-key products as necessary
+        products = products.map(p => {
+            return {
+                ...p,
+                isInStore: p.external_product_id !== null
+            };
+        })
+
 
         console.log(products)
 
@@ -53,7 +64,7 @@ const getProductById = async (req, res) => {
 // Create a new product
 const createProduct = async (req, res) => {
     try {
-        const productData = { ...req.body, user_id: req.userId };
+        const productData = { ...req.body, user_id: req.userId, store_id: req.storeId };
         const product = await productModel.createProduct(productData);
         return res.status(201).json(product);
     } catch (error) {
@@ -140,17 +151,14 @@ const getVariantByProductIDArray = async (req, res) => {
         const client = await db.connect();
     const query = `
       SELECT 
-        variant_id, 
-        product_id, 
-        variant_name, 
-        price, 
-        sku, 
-        stock_quantity, 
-        created_at, 
-        external_variant_id, 
-        external_parent_id, 
-        updated_at 
-      FROM variants 
+        v.variant_id, 
+        v.product_id, 
+        v.sku, 
+        v.created_at, 
+        v.updated_at,
+        (vo.name || ': ' || vo.value) AS "variant_name"
+      FROM variants v
+      INNER JOIN variant_options vo ON v.variant_id = vo.variant_id
       WHERE product_id = ANY($1)
     `;
     const { rows } = await client.query(query, [productIds]);

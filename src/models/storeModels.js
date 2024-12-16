@@ -39,6 +39,22 @@ const updateStoreAccessKey = async (storeDomain, storeAccessKey) => {
   }
 };
 
+const setFulfillmentServiceId = async (storeDomain, fulfillmentServiceId, locationId) => {
+  try {
+    const result = await db.query(
+      `UPDATE stores
+      SET fulfillment_service_id = $1, location_id = $2
+      WHERE store_domain = $3
+      RETURNING *;`,
+      [fulfillmentServiceId, locationId, storeDomain]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error setting fulfillment service ID");
+    throw error;
+  }
+}
+
 
 
 // Retrieve a store by domain and user ID
@@ -96,6 +112,10 @@ const saveProductToStoreProducts = async ({ store_id, product_id, external_produ
   }
 };
 
+const saveProductVariants = async ({ store_id, product_id, external_product_id, variant_id }) => {
+  
+}
+
 // Fetch product with variants by product_id
 const getProductWithVariants = async (product_id) => {
   const client = await db.connect();
@@ -131,4 +151,5 @@ module.exports = {
     updateStoreAccessKey,
     saveProductToStoreProducts,
     getProductWithVariants,
+    setFulfillmentServiceId,
 };

@@ -10,6 +10,6 @@ router.post('/shopify/getShopOrders', authenticateUser, shopifyController.proces
 // fetch Shopify products
 router.post("/shopify/getStoreProducts", authenticateUser, shopifyController.storeProducts);
 // add a product to your shopify store
-router.post("/shopify/addProduct", authenticateUser, shopifyController.addProductToShopifyStore)
+router.post("/shopify/addProduct", authenticateUser, shopifyController.addOrUpdateProduct)
 
 module.exports = router;
