@@ -146,13 +146,22 @@ const addOrUpdateProduct = async (req, res) => {
 
   try {
     // fetch the store information
-    const store = await storeModel.getStoreByDomain(storeDomain);
+    let store = await storeModel.getStoreByDomain(storeDomain);
     if (!store || !store.store_id) { // we specifically need store_id for everything else
       const errMsg = `Store "${storeDomain}" not found`;
       return res.status(400).send({ message: errMsg });
     }
 
     const accessToken = store.store_access_key;
+    
+    // Create the fulfillment service if it doesn't exist
+    if (!store.fulfillment_service_id) {
+      const fulfillmentSvc = await shopifyUtils.createFulfillmentService(storeDomain, accessToken);
+      console.log(fulfillmentSvc);
+      store = storeModel.setFulfillmentServiceId(storeDomain, fulfillmentSvc.id, fulfillmentSvc.location.id);
+    }
+    console.log("Current store", store);
+
 
     // fetch the internal product
     const product = await productModel.getProductByIdWithStoreMeta(product_id, store.store_id);
@@ -160,7 +169,7 @@ const addOrUpdateProduct = async (req, res) => {
       const errMsg = `Product ID "${product_id}" does not exist`; 
       return res.status(400).send({ message: errMsg });
     }
-    console.log("Products", JSON.stringify(product, null, 2));
+    console.log("Product", JSON.stringify(product, null, 2));
     // Either a list of options or empty - either is fine
     const productOptions = await productModel.getProductOptions(product_id);
 
@@ -187,6 +196,7 @@ const addOrUpdateProduct = async (req, res) => {
       // if forwarding product status to Shopify, do it here
       // status: "ACTIVE" | "ARCHIVED" | "DRAFT",
     };
+    console.log("Product payload", productPayload);
 
     // If the product already exists, we're updating
     // TODO: Verify that the product actually exists in Shopify, and wasn't deleted - ideally at refresh, and not here
@@ -223,13 +233,13 @@ const addOrUpdateProduct = async (req, res) => {
         })
       }
     });
-    console.log("Variants payload", JSON.stringify(variantsPayload, null, 2));
     const variantsRes = await shopifyUtils.addVariantsToProduct(
       storeDomain, 
       accessToken, 
       externalProductId, 
+      store.location_id,
       product.price, 
-      variantsPayload
+      variantsPayload,
     );
     console.log("Variants res", JSON.stringify(variantsRes, null, 2));
 
@@ -246,6 +256,8 @@ const addOrUpdateProduct = async (req, res) => {
       })
     );
     console.log("DB result", dbResult);
+
+    // TODO: Handle publishing to Shopify Online Store - right now user has to publish manually from Shopify admin
 
     return res.status(201).send({ });
   } catch (error) {
